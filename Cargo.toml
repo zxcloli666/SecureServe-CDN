@@ -1,0 +1,26 @@
+[package]
+name = "secureserve-cdn"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+actix-cors = "0.7"
+actix-files = "0.6"
+actix-multipart = "0.7"
+actix-web = "4"
+chrono = "0.4"
+env_logger = "0.11"
+log = "0.4"
+rand = "0.8"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+
+[profile.release]
+lto = true
+opt-level = "s"
+debug = false
+panic = "abort"
+strip = "symbols"
+codegen-units = 1
