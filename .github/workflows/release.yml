@@ -3,11 +3,23 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.message, '!release:')
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '!release:')
     permissions:
       contents: write
       packages: write
@@ -20,9 +32,12 @@ jobs:
       - name: Parse release type
         id: parse
         env:
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          COMMIT_MSG: ${{ github.event.head_commit.message || '' }}
+          MANUAL_BUMP: ${{ github.event.inputs.bump || '' }}
         run: |
-          if echo "$COMMIT_MSG" | grep -qiE '!release:\s*major'; then
+          if [ -n "$MANUAL_BUMP" ]; then
+            echo "bump=$MANUAL_BUMP" >> "$GITHUB_OUTPUT"
+          elif echo "$COMMIT_MSG" | grep -qiE '!release:\s*major'; then
             echo "bump=major" >> "$GITHUB_OUTPUT"
           elif echo "$COMMIT_MSG" | grep -qiE '!release:\s*minor'; then
             echo "bump=minor" >> "$GITHUB_OUTPUT"
