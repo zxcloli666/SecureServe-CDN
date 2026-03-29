@@ -140,7 +140,16 @@ pub async fn upload_file(
         }
     }
 
-    match file.file.persist(&dest) {
+    let save_result = match file.file.persist(&dest) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            // Cross-device rename fails; fall back to copy + delete
+            let temp_path = e.file.path().to_owned();
+            fs::copy(&temp_path, &dest).and_then(|_| fs::remove_file(&temp_path))
+        }
+    };
+
+    match save_result {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({ "message": "uploaded", "path": pending.path })),
         Err(e) => HttpResponse::InternalServerError().json(ApiError {
             error: format!("failed to save file: {e}"),
