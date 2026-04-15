@@ -14,8 +14,32 @@ docker compose up -d
 |-----------------|-----------------|----------------------------------------------|
 | `PORT`          | `3000`          | Server port                                  |
 | `ADMIN_TOKEN`   | *(empty)*       | Admin auth token. **Empty = admin disabled** |
-| `STORAGE_PATH`  | `./storage`     | Where uploaded files are stored              |
+| `STORAGE_PATH`  | `./storage`     | Where uploaded files are stored (local mode) |
 | `DATABASE_PATH` | `./data/cdn.db` | SQLite database file                         |
+| `STORAGE_MODE`  | `local`         | Storage backend: `local` or `s3`             |
+
+### S3 Mode
+
+Set `STORAGE_MODE=s3` and the variables below. Works with AWS S3, MinIO,
+Cloudflare R2, Backblaze B2 and other S3-compatible services.
+
+- Uploads are forwarded from the server to S3 (`PutObject`).
+- Downloads return a **302 redirect** to a presigned `GetObject` URL
+  (TTL configurable via `S3_PRESIGN_TTL`, default 1h). The client fetches
+  bytes directly from S3 — the CDN server does not proxy the file body,
+  so there's no egress through it.
+- Missing objects return the regular 404 page (a `HeadObject` check runs
+  before signing).
+
+| Variable              | Default      | Description                                                                      |
+|-----------------------|--------------|----------------------------------------------------------------------------------|
+| `S3_BUCKET`           | *(required)* | Bucket name                                                                      |
+| `S3_ACCESS_KEY`       | *(required)* | Access key ID                                                                    |
+| `S3_SECRET_KEY`       | *(required)* | Secret access key                                                                |
+| `S3_REGION`           | `us-east-1`  | Region                                                                           |
+| `S3_ENDPOINT`         | *(empty)*    | Custom endpoint URL for non-AWS providers (e.g. `http://minio:9000`)             |
+| `S3_FORCE_PATH_STYLE` | `true`       | Use path-style addressing (`host/bucket/key`). Set `false` for AWS virtual-host. |
+| `S3_PRESIGN_TTL`      | `3600`       | Presigned download URL lifetime in seconds.                                      |
 
 ## API
 

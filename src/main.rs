@@ -1,4 +1,3 @@
-use std::fs;
 use std::sync::Arc;
 
 use actix_cors::Cors;
@@ -11,6 +10,7 @@ mod config;
 mod db;
 mod models;
 mod routes;
+mod storage;
 mod templates;
 
 #[tokio::main]
@@ -19,7 +19,24 @@ async fn main() -> std::io::Result<()> {
 
     let cfg = config::Config::from_env();
 
-    fs::create_dir_all(&cfg.storage_path).expect("failed to create storage directory");
+    let storage = Arc::new(
+        storage::Storage::from_config(&cfg)
+            .await
+            .expect("failed to init storage"),
+    );
+
+    match cfg.storage_mode {
+        config::StorageMode::Local => info!("storage mode: local ({})", cfg.storage_path),
+        config::StorageMode::S3 => {
+            let s3 = cfg.s3.as_ref().unwrap();
+            info!(
+                "storage mode: s3 (bucket={}, region={}, endpoint={})",
+                s3.bucket,
+                s3.region,
+                s3.endpoint.as_deref().unwrap_or("<aws-default>")
+            );
+        }
+    }
 
     info!("opening database at {}", cfg.database_path);
     let database = Arc::new(db::Db::open(&cfg.database_path).expect("failed to open database"));
@@ -37,6 +54,7 @@ async fn main() -> std::io::Result<()> {
 
     let db_data = web::Data::new(database);
     let cfg_data = web::Data::new(cfg.clone());
+    let storage_data = web::Data::new(storage);
 
     HttpServer::new(move || {
         App::new()
@@ -49,6 +67,7 @@ async fn main() -> std::io::Result<()> {
             )
             .app_data(db_data.clone())
             .app_data(cfg_data.clone())
+            .app_data(storage_data.clone())
             .service(routes::tokens::admin_page)
             .service(routes::tokens::verify_admin)
             .service(routes::tokens::list_tokens)

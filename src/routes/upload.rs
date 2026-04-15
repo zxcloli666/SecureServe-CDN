@@ -1,5 +1,3 @@
-use std::fs;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use actix_multipart::form::{tempfile::TempFile, text::Text, MultipartForm};
@@ -7,9 +5,9 @@ use actix_web::{post, web, HttpRequest, HttpResponse};
 use chrono::Utc;
 
 use crate::auth;
-use crate::config::Config;
 use crate::db::Db;
 use crate::models::{ApiError, PendingUpload, SignUploadRequest, SignUploadResponse};
+use crate::storage::Storage;
 
 const UPLOAD_TTL_SECS: i64 = 1800;
 
@@ -78,7 +76,7 @@ pub async fn sign_upload(
 
 #[post("/api/upload")]
 pub async fn upload_file(
-    config: web::Data<Config>,
+    storage: web::Data<Arc<Storage>>,
     db: web::Data<Arc<Db>>,
     MultipartForm(form): MultipartForm<UploadForm>,
 ) -> HttpResponse {
@@ -128,29 +126,16 @@ pub async fn upload_file(
 
     let _ = db.delete_pending_upload(&token);
 
-    let dest = PathBuf::from(&config.storage_path).join(&pending.path);
-
-    if let Some(parent) = dest.parent() {
-        if !parent.exists() {
-            if let Err(e) = fs::create_dir_all(parent) {
-                return HttpResponse::InternalServerError().json(ApiError {
-                    error: format!("failed to create directory: {e}"),
-                });
-            }
-        }
-    }
-
-    let save_result = match file.file.persist(&dest) {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            // Cross-device rename fails; fall back to copy + delete
-            let temp_path = e.file.path().to_owned();
-            fs::copy(&temp_path, &dest).and_then(|_| fs::remove_file(&temp_path))
-        }
+    let temp_path = file.file.path().to_owned();
+    let ct = if content_type.is_empty() {
+        "application/octet-stream".to_string()
+    } else {
+        content_type
     };
 
-    match save_result {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({ "message": "uploaded", "path": pending.path })),
+    match storage.put_file(&pending.path, &temp_path, &ct).await {
+        Ok(_) => HttpResponse::Ok()
+            .json(serde_json::json!({ "message": "uploaded", "path": pending.path })),
         Err(e) => HttpResponse::InternalServerError().json(ApiError {
             error: format!("failed to save file: {e}"),
         }),

@@ -9,6 +9,16 @@ services:
       - ADMIN_TOKEN=${ADMIN_TOKEN:-}
       - STORAGE_PATH=/storage
       - DATABASE_PATH=/data/cdn.db
+      # Storage backend: "local" (default) or "s3"
+      - STORAGE_MODE=${STORAGE_MODE:-local}
+      # S3 settings (used only when STORAGE_MODE=s3)
+      - S3_BUCKET=${S3_BUCKET:-}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-true}
+      - S3_PRESIGN_TTL=${S3_PRESIGN_TTL:-3600}
     volumes:
       - ./storage:/storage
       - ./data:/data
